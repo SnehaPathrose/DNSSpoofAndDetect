@@ -1,0 +1,107 @@
+Report for Homework 4
+=====================
+
+Language used: Python 2.7.14
+
+OS version: Ubuntu 17.10 (Linux 4.11.0-10-generic x86_64) 
+
+Packages to be installed:
+sudo apt-get install net-tools
+sudo apt-get install python
+sudo apt-get install python-scapy
+sudo apt-get install python-netifaces
+
+Files: dnsinject.py, dnsdetect.py, sample.pcap
+
+References:
+http://www.cs.dartmouth.edu/~sergey/netreads/local/reliable-dns-spoofing-with-python-scapy-nfqueue.html#selection-377.35-377.68
+
+http://www.secdev.org/projects/scapy/files/scapydoc.pdf
+
+https://thepacketgeek.com/scapy-p-09-scapy-and-dns/
+
+dnsinject
+=========
+
+General Design:
+-> dnsinject captures DNS packets(filter is set as udp port 53 by default) from an interface if specified, else it sniffs the default interface in promiscuous mode.
+-> A callback function is executed for each captured DNS packet. In this function if the packet contains a Question record layer and is a DNS query, we create a spoofed packet for it. 
+-> We then send the spoofed packet via the same interface. If a hostname IP pair is specified in hostnames file, the spoofed packed is redirected to the IP corresponding to the hostname, else we do not inject packet. If no hostnames file is specified, we redirect the spoofed packet to IP of the interface.
+
+Sample trace file with the injected traffic: sample.pcap
+
+Usage:
+sudo python dnsinject.py [-i interface] [-h hostnames] expression
+
+Examples:
+1. In case you do not want to specify any filter expression provide '' . By default udp port 53 is part of filter
+
+Command:
+sudo python dnsinject.py '' -h hostnames
+Output:
+Sent 1 packets.
+
+2. Specify a particular source host to sniff from
+Command:
+sudo python dnsinject.py 'src 192.168.43.11' -h hostnames
+Output:
+Sent 1 packets.
+
+dnsdetect
+=========
+General design:
+-> dnsdetect captures DNS packets(filter is set as udp port 53 by default) from an interface if specified, else it sniffs the default interface in promiscuous mode.
+-> A callback function is executed for each captured DNS packet. In this function if the packet contains a Question record layer and is a DNS response, we check if the packet with transaction id is present in a global dictionary, else we add to this dict.
+-> If a packet with the captured packets txid already exists in the global dict, we check if the ethernet source addresses are different. If yes, we print DNS poisoning attempt
+-> We also check if the ttl values are different for the captured packet and the packet in the global dict. If yes, we print DNS poisoning attempt
+
+Avoiding False positives:
+-> We compare the ttl value corresponding to the answer record that has the same rrname as the Question records qname, with the ttl value of the packet in the global dictionary
+
+->If a tracefile is specified, then dnsdetect analyzes packets in file and not from live interface.
+
+
+Usage:
+sudo python dnsdetect.py [-i interface] [-r tracefile] expression
+
+Examples:
+1. In case you do not want to specify any filter expression provide '' . By default udp port 53 is part of filter
+Command:
+sudo python dnsdetect.py ''
+
+2. Specify a particular destination host to sniff from
+Command:
+sudo python dnsdetect.py 'dst 192.168.43.11'
+
+3. Specify the pcap file
+Command:
+sudo python dnsdetect.py '' -r sample.pcap
+
+
+dnsdetect Output for attached sample.pcap file:
+===============================================
+
+2017-12-12 20:29:50.448735 DNS poisoning attempt
+TXID 16632 Request www.yahoo1.com
+Answer1
+rc.yahoo.com.
+src.g03.yahoodns.net.
+Answer2
+123.234.56.78
+
+2017-12-12 20:29:50.453803 DNS poisoning attempt
+TXID 24105 Request www.exam.com
+Answer1
+104.27.171.253
+104.27.170.253
+Answer2
+0.0.0.0
+
+2017-12-12 20:29:50.458752 DNS poisoning attempt
+TXID 34269 Request www.8people.com
+Answer1
+8people.com.
+208.109.97.221
+Answer2
+123.234.56.78
+
