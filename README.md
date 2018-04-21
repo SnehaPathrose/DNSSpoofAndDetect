@@ -69,6 +69,9 @@ transaction ID, attacked domain name, and the original and malicious IP
 addresses - for example:
 
 20160406-15:08:49.205618  DNS poisoning attempt 
+
 TXID 0x5cce Request www.example.com
+
 Answer1 [List of IP addresses]
+
 Answer2 [List of IP addresses]
